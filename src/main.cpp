@@ -84,6 +84,14 @@ void setup() {
 bool isActive()
 {
   auto arguments = httpControl->getLedProfileFullParameters();
+  
+  // Add debug logging occasionally to help with troubleshooting
+  static unsigned long lastDebugLog = 0;
+  if (millis() - lastDebugLog > 30000) { // Log every 30 seconds
+    Serial.println("Status check - useSecondary: " + String(arguments.useSecondary ? "true" : "false"));
+    lastDebugLog = millis();
+  }
+  
   return arguments.useSecondary;
   //return true;
 }
