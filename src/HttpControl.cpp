@@ -18,10 +18,19 @@ void HttpControl::readMacAddress(){
 HttpControl::HttpControl()
 {
     readMacAddress();
+    lastHttpRequestTime = 0;
+    cacheValid = false;
+    memset(&cachedArguments, 0, sizeof(cachedArguments));
 }
 
 Arguments HttpControl::getLedProfileFullParameters()
 {
+    // Check if cached data is still valid
+    unsigned long currentTime = millis();
+    if (cacheValid && (currentTime - lastHttpRequestTime < CACHE_DURATION_MS)) {
+        return cachedArguments;
+    }
+
     HTTPClient http;
     String serverResponse;
     JsonDocument doc;
@@ -34,16 +43,22 @@ Arguments HttpControl::getLedProfileFullParameters()
     {
         if(http.GET() == 200)
             break;
-        Serial.println("HTTP Error");
+        Serial.println("HTTP Error - attempt " + String(triesCount + 1));
         delay(SLEEP_INTERVAL);
-
+        yield(); // Allow other tasks to run
         triesCount++;
     }
 
     if(triesCount == MAX_TRIES_COUNT)
     {
+        Serial.println("HTTP failed after all retries, using cached data or defaults");
         memset(&result, 0, sizeof(result));
         http.end();
+        
+        // If we have cached data, return it even if expired
+        if (cacheValid) {
+            return cachedArguments;
+        }
         return result;
     }
 
@@ -65,6 +80,11 @@ Arguments HttpControl::getLedProfileFullParameters()
     result.secondaryBlue2 = (int)doc["secondary_blue2"];
 
     http.end();
+
+    // Update cache
+    cachedArguments = result;
+    lastHttpRequestTime = currentTime;
+    cacheValid = true;
 
     return result;
 }

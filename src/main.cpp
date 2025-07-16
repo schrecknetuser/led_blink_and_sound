@@ -17,6 +17,7 @@
 #define NEOPIXEL_BRIGHTNESS 255
 
 #define THRESHOLD 10*1000
+#define MAIN_LOOP_DELAY 100  // Base delay in main loop to prevent excessive CPU usage
 
 static const uint8_t PIN_MP3_TX = 25;
 static const uint8_t PIN_MP3_RX = 27;
@@ -90,8 +91,9 @@ bool isActive()
 
 void loop() {
 
-
-  
+  // Add base delay to prevent excessive CPU usage and allow other tasks
+  delay(MAIN_LOOP_DELAY);
+  yield();
 
   if(!isActive())
   {
@@ -178,23 +180,35 @@ void loop() {
       rgbWS.show();
       yield();
       delay(random(flashOffsetMin, flashOffsetMax));
+      
       rgbWS.fill(color, NEOPIXEL_LED_COUNT/4*2, NEOPIXEL_LED_COUNT/4);
       rgbWS.show();
       yield();
       delay(random(flashOffsetMin, flashOffsetMax));
+      
       rgbWS.fill(color, NEOPIXEL_LED_COUNT/4, NEOPIXEL_LED_COUNT/4);
       rgbWS.show();
       yield();
       delay(random(flashOffsetMin, flashOffsetMax));
+      
       rgbWS.fill(color, NEOPIXEL_LED_COUNT/4*2, NEOPIXEL_LED_COUNT/4*2);
       rgbWS.show();
       yield();
       delay (random(flashDurationMin, flashDurationMax));
+      
       rgbWS.clear();
       rgbWS.show();
       yield();
       delay (random(nextFlashDelayMin, nextFlashDelayMax));
       yield();
+      
+      // Check if we should exit early due to LED state change
+      if(!isActive())
+      {
+        rgbWS.fill(rgbWS.Color(0, 0, 0), 0, NEOPIXEL_LED_COUNT);
+        rgbWS.show();
+        return;
+      }
     }
 
     if(!isActive())
@@ -212,10 +226,22 @@ void loop() {
   //myPlayer.volume(30);
   ulong startMillis = millis();
   myPlayer.play(randomTrack);
+  
+  // Improved audio player handling with better timeout and error checking
   while(myPlayer.isPlaying())
   {
-    delay(1);
+    delay(10);  // Increased delay to reduce CPU usage
+    yield();    // Allow other tasks to run
+    
     if(millis() - startMillis > THRESHOLD)
+    {
+      Serial.println("Audio playback timeout, stopping player");
+      myPlayer.stop();
+      break;
+    }
+    
+    // Check if we should exit early due to LED state change
+    if(!isActive())
     {
       myPlayer.stop();
       break;
